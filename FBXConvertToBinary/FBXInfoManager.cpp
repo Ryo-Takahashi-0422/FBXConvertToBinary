@@ -84,7 +84,7 @@ int FBXInfoManager::Init(std::string _modelPath)
     manager->Destroy();
 
     // ファイル書き込み
-    const char* fileName = "C:\\Users\\RyoTaka\\Desktop\\InputTest.txt";
+    const char* fileName = "C:\\Users\\RyoTaka\\Desktop\\InputTest.bin";
     FILE* fp = nullptr;
     fopen_s(&fp, fileName, "wb");
     if (fp == nullptr) {
@@ -343,19 +343,70 @@ void FBXInfoManager::ReadFBXFile()
             // インテックス情報の処理
             std::vector<unsigned int> indices;
             std::vector<std::array<int, 2>> oldNewIndexPairList;
-            for (int polIndex = 0; polIndex < fbxMesh->GetPolygonCount(); polIndex++) // ポリゴン毎のループ
-            {
-                for (int polVertexIndex = 0; polVertexIndex < fbxMesh->GetPolygonSize(polIndex); polVertexIndex++) // 頂点毎のループ
-                {
-                    // インデックス座標
-                    auto vertexIndex = fbxMesh->GetPolygonVertex(polIndex, polVertexIndex);
-                    vertexIndex += indiceIndexOfOBB;
 
-                    // インデックス座標を設定。分割されたメッシュのインデックスは、何もしないと番号が0から振り直される。一方、インデックスはメッシュが分割されていようが単一のものだろうが通し番号なので、
-                    // メッシュを分割する場合は一つ前に読み込んだメッシュのインデックス番号の内、「最大の値 + 1」したものを追加する必要がある。
-                    indices.push_back(vertexIndex);
-                }
-            }
+            
+            //for (int polIndex = 0; polIndex < fbxMesh->GetPolygonCount(); polIndex++) // ポリゴン毎のループ
+            //{
+            //    for (int polVertexIndex = 0; polVertexIndex < fbxMesh->GetPolygonSize(polIndex); polVertexIndex++) // 頂点毎のループ
+            //    {
+            //        // インデックス座標
+            //        auto vertexIndex = fbxMesh->GetPolygonVertex(polIndex, polVertexIndex);
+            //        vertexIndex += indiceIndexOfOBB;
+
+            //        // インデックス座標を設定。分割されたメッシュのインデックスは、何もしないと番号が0から振り直される。一方、インデックスはメッシュが分割されていようが単一のものだろうが通し番号なので、
+            //        // メッシュを分割する場合は一つ前に読み込んだメッシュのインデックス番号の内、「最大の値 + 1」したものを追加する必要がある。
+            //        indices.push_back(vertexIndex);
+            //    }
+            //}
+            // blenderからの出力結果が正しくない(立方体内部にポリゴンが描画されるインデクスが出力されている)ため、手入力で対応する。
+            // 斜め線も入れたいので、面を斜めに結ぶインデクスにしている
+            indices.push_back(0);
+            indices.push_back(1);
+            indices.push_back(2);
+
+            indices.push_back(2);
+            indices.push_back(0);
+            indices.push_back(3);
+
+            indices.push_back(3);
+            indices.push_back(2);
+            indices.push_back(6);
+
+            indices.push_back(6);
+            indices.push_back(3);
+            indices.push_back(7);
+
+            indices.push_back(7);
+            indices.push_back(6);
+            indices.push_back(4);
+
+            indices.push_back(4);
+            indices.push_back(6);
+            indices.push_back(5);
+
+            indices.push_back(5);
+            indices.push_back(6);
+            indices.push_back(2);
+
+            indices.push_back(2);
+            indices.push_back(5);
+            indices.push_back(1);
+
+            indices.push_back(5);
+            indices.push_back(1);
+            indices.push_back(0);
+
+            indices.push_back(0);
+            indices.push_back(5);
+            indices.push_back(4);
+
+            indices.push_back(4);
+            indices.push_back(7);
+            indices.push_back(3);
+
+            indices.push_back(3);
+            indices.push_back(4);
+            indices.push_back(0);
 
             vertexInfo.second.indices = indices;
             vertexListOfOBB.push_back(vertexInfo);
@@ -445,6 +496,7 @@ void FBXInfoManager::ReadFBXFile()
             std::vector<float> vertexInfo = vertexInfoList[i];
             if (vertexInfo.size() > 3)
             {
+                // uvについて、タイリングするものは1以上、0未満の値が入る。これらをピクセルシェーダーに渡す前にここもしくは頂点シェーダーで加工すると、ピクセルシェーダーでの処理に様々な不具合が発生する
                 vertices.push_back(FBXVertex
                 {
                     {
