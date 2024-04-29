@@ -356,6 +356,8 @@ void FBXInfoManager::ReadFBXFile()
 
     int meshCount = scene->GetSrcObjectCount<FbxMesh>();
 
+    int indiceIndexOfOCC = 0;
+
     for(int i = 0; i < meshCount; ++i)
     {
         //Get vertex information(pos, index, uv, normal)
@@ -490,7 +492,7 @@ void FBXInfoManager::ReadFBXFile()
         }
 
         // OCC(occlusion culling用モデル)の処理
-        int indiceIndexOfOCC = 0;
+        /*int indiceIndexOfOCC = 0;*/
         if (targetName == "OCC")
         {
             // 頂点情報の処理
@@ -529,7 +531,12 @@ void FBXInfoManager::ReadFBXFile()
 
             vertexInfo.second.indices = indices;
             vertexListOfOCC.push_back(vertexInfo);
-            indiceIndexOfOCC = indices.size();
+
+            // 前回読み込んだメッシュのインデックス番号の内、最大値を抽出する
+            auto iter = std::max_element(indices.begin(), indices.end());
+            size_t index = std::distance(indices.begin(), iter);
+            indiceIndexOfOCC = indices[index] + 1;
+            //indiceIndexOfOCC = indices.size();
 
             // マテリアル情報元のノード取得
             FbxNode* node = fbxMesh->GetNode();
