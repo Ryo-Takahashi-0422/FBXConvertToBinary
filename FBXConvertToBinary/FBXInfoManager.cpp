@@ -227,6 +227,8 @@ int FBXInfoManager::Init(std::string _modelPath)
         fwrite(&tempMatrix, sizeof(tempMatrix), 1, fp);
     }
 
+
+    // OBB
     // vertexListOfOBB用データ処理
     auto itvertexListOfOBB = vertexListOfOBB.begin();
     int vertexListOfOBBSize = vertexListOfOBB.size();
@@ -276,6 +278,58 @@ int FBXInfoManager::Init(std::string _modelPath)
         fwrite(&itlocalPosAndRotOfOBB->second.first, sizeof(itlocalPosAndRotOfOBB->second.first), 1, fp);
         fwrite(&itlocalPosAndRotOfOBB->second.second, sizeof(itlocalPosAndRotOfOBB->second.second), 1, fp);
         ++itlocalPosAndRotOfOBB;
+    }
+
+
+    // OCC
+    // vertexListOfOCC用データ処理
+    auto itvertexListOfOCC = vertexListOfOCC.begin();
+    int vertexListOfOCCSize = vertexListOfOCC.size();
+    fwrite(&vertexListOfOCCSize, sizeof(vertexListOfOCCSize), 1, fp);
+
+    for (int i = 0; i < vertexListOfOCCSize; ++i)
+    {
+        auto meshName = itvertexListOfOCC->first;
+        unsigned int meshNameSize = meshName.length();
+
+        fwrite(&meshNameSize, sizeof(meshNameSize), 1, fp);
+        fwrite(meshName.c_str(), meshNameSize, 1, fp);
+
+        int verticesSize = itvertexListOfOCC->second.vertices.size();
+        fwrite(&verticesSize, sizeof(verticesSize), 1, fp);
+
+        int indicesSize = itvertexListOfOCC->second.indices.size();
+        fwrite(&indicesSize, sizeof(indicesSize), 1, fp);
+
+        // FBXVertex 書き込み
+        for (auto& vertex : itvertexListOfOCC->second.vertices)
+        {
+            fwrite(&vertex, sizeof(vertex), 1, fp);
+        }
+
+        // Indeice 書き込み
+        for (auto& indice : itvertexListOfOCC->second.indices)
+        {
+            fwrite(&indice, sizeof(indice), 1, fp);
+        }
+        ++itvertexListOfOCC;
+    }
+
+    // localPosAndRotOCC用のデータ処理
+    auto itlocalPosAndRotOfOCC = localPosAndRotOfOCC.begin();
+    int localPosAndRotOfOCCSize = localPosAndRotOfOCC.size();
+    fwrite(&localPosAndRotOfOCCSize, sizeof(localPosAndRotOfOCCSize), 1, fp);
+    for (int i = 0; i < localPosAndRotOfOCC.size(); ++i)
+    {
+        // メッシュ名の読み書き
+        auto meshName = itlocalPosAndRotOfOCC->first;
+        unsigned int meshNameSize = meshName.length();
+        fwrite(&meshNameSize, sizeof(meshNameSize), 1, fp);
+        fwrite(meshName.c_str(), meshNameSize, 1, fp);
+
+        fwrite(&itlocalPosAndRotOfOCC->second.first, sizeof(itlocalPosAndRotOfOCC->second.first), 1, fp);
+        fwrite(&itlocalPosAndRotOfOCC->second.second, sizeof(itlocalPosAndRotOfOCC->second.second), 1, fp);
+        ++itlocalPosAndRotOfOCC;
     }
     
     std::cout << fileName << "に書き込みました。" << std::endl;
@@ -431,6 +485,71 @@ void FBXInfoManager::ReadFBXFile()
             lRot.y = (float)localRotation.mData[1];
             lRot.z = (float)localRotation.mData[2];
             localPosAndRotOfOBB[name].second = lRot;
+
+            continue;
+        }
+
+        // OCC(occlusion culling用モデル)の処理
+        int indiceIndexOfOCC = 0;
+        if (targetName == "OCC")
+        {
+            // 頂点情報の処理
+            int controlPointCount = fbxMesh->GetControlPointsCount();
+            VertexInfo vertex;
+            for (int i = 0; i < controlPointCount; i++)
+            {
+                // 頂点座標を読み込んで設定
+                auto point = fbxMesh->GetControlPointAt(i);
+                vertex.vertices.resize(controlPointCount);
+                vertex.vertices[i].pos.x = point[0];
+                vertex.vertices[i].pos.y = point[1];
+                vertex.vertices[i].pos.z = point[2];
+            }
+            std::pair<std::string, VertexInfo> vertexInfo;
+            vertexInfo.first = name;
+            vertexInfo.second = vertex;
+
+
+            // インテックス情報の処理
+            std::vector<unsigned int> indices;
+            std::vector<std::array<int, 2>> oldNewIndexPairList;
+            for (int polIndex = 0; polIndex < fbxMesh->GetPolygonCount(); polIndex++) // ポリゴン毎のループ
+            {
+                for (int polVertexIndex = 0; polVertexIndex < fbxMesh->GetPolygonSize(polIndex); polVertexIndex++) // 頂点毎のループ
+                {
+                    // インデックス座標
+                    auto vertexIndex = fbxMesh->GetPolygonVertex(polIndex, polVertexIndex);
+                    vertexIndex += indiceIndexOfOCC;
+
+                    // インデックス座標を設定。分割されたメッシュのインデックスは、何もしないと番号が0から振り直される。一方、インデックスはメッシュが分割されていようが単一のものだろうが通し番号なので、
+                    // メッシュを分割する場合は一つ前に読み込んだメッシュのインデックス番号の内、「最大の値 + 1」したものを追加する必要がある。
+                    indices.push_back(vertexIndex);
+                }
+            }
+
+            vertexInfo.second.indices = indices;
+            vertexListOfOCC.push_back(vertexInfo);
+            indiceIndexOfOCC = indices.size();
+
+            // マテリアル情報元のノード取得
+            FbxNode* node = fbxMesh->GetNode();
+            if (node == 0)
+            {
+                continue;
+            }
+            // OCCのためローカル座標・角度取得
+            localTransition = node->LclTranslation.Get();
+            XMFLOAT3 lPos;
+            lPos.x = (float)localTransition.mData[0];
+            lPos.y = (float)localTransition.mData[1];
+            lPos.z = (float)localTransition.mData[2];
+            localPosAndRotOfOCC[name].first = lPos;
+            localRotation = node->LclRotation.Get();
+            XMFLOAT3 lRot;
+            lRot.x = (float)localRotation.mData[0];
+            lRot.y = (float)localRotation.mData[1];
+            lRot.z = (float)localRotation.mData[2];
+            localPosAndRotOfOCC[name].second = lRot;
 
             continue;
         }
