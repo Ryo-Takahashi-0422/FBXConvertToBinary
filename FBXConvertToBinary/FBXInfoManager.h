@@ -123,9 +123,13 @@ private:
 	bool isBonesInitialPostureMatrixFilled = false;
 
 	std::map<std::string, std::pair<XMFLOAT3, XMFLOAT3>> localPosAndRotOfMesh; // メッシュ毎のローカル座標・回転
-	std::map<std::string, std::pair<XMFLOAT3, XMFLOAT3>> localPosAndRotOfOBB; // OBB毎のローカル座標・回転
 
+	std::map<std::string, std::pair<XMFLOAT3, XMFLOAT3>> localPosAndRotOfOBB; // OBB毎のローカル座標・回転
 	std::vector<std::pair<std::string, VertexInfo>> vertexListOfOBB;
+
+	std::map<std::string, std::pair<XMFLOAT3, XMFLOAT3>> localPosAndRotOfOCC; // OCC毎のローカル座標・回転
+	std::vector<std::pair<std::string, VertexInfo>> vertexListOfOCC;
+
 
 public:
 	//Get Singleton Instance
